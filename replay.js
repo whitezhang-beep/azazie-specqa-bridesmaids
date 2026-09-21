@@ -299,7 +299,22 @@
 
   function existingPanel() {
     if (panelWin && !panelWin.closed) return panelWin;
+    try {
+      if (window.__azazieSpecQaPanelWin && !window.__azazieSpecQaPanelWin.closed) {
+        return window.__azazieSpecQaPanelWin;
+      }
+    } catch (e) {}
     return null;
+  }
+
+  function looksLikeBrowserTab(w) {
+    if (!w || w.closed) return false;
+    try {
+      if (w.toolbar && w.toolbar.visible) return true;
+      if (w.menubar && w.menubar.visible) return true;
+      if ((w.outerWidth || 0) > PANEL_W + 160) return true;
+    } catch (e) {}
+    return false;
   }
 
   function specQaChannelName(device) {
@@ -1007,25 +1022,16 @@
         (floatPanel ? 80 : panelLeft()) +
         ",top=" +
         (floatPanel ? 80 : panelTop()) +
-        ",menubar=no,toolbar=no,location=no,status=no";
+        ",menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes";
       var w = existingPanel();
-      if (!w || w.closed) {
+      if (w && looksLikeBrowserTab(w)) {
         try {
-          w = window.open("", winName);
-        } catch (e) {
-          w = null;
-        }
-      }
-      if (!w || w.closed) {
+          w.close();
+        } catch (e) {}
+        w = null;
+        panelWin = null;
         try {
-          w = window.open("", winName, feat);
-        } catch (e) {
-          w = null;
-        }
-      }
-      if ((!w || w.closed) && window.opener && !window.opener.closed) {
-        try {
-          w = window.opener.open("", winName, feat);
+          window.__azazieSpecQaPanelWin = null;
         } catch (e) {}
       }
       if (!w || w.closed) {
@@ -1035,7 +1041,25 @@
           w = null;
         }
       }
+      if (w && looksLikeBrowserTab(w)) {
+        try {
+          w.close();
+        } catch (e) {}
+        try {
+          w = window.open("about:blank", winName, feat);
+        } catch (e) {
+          w = null;
+        }
+      }
+      if ((!w || w.closed) && window.opener && !window.opener.closed) {
+        try {
+          w = window.opener.open("about:blank", winName, feat);
+        } catch (e) {}
+      }
       if (!w || w.closed) return false;
+      try {
+        window.__azazieSpecQaPanelWin = w;
+      } catch (e) {}
       if (!fillPanel(w, winTitle)) {
         closePanel();
         return false;
