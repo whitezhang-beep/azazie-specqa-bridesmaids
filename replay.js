@@ -10,7 +10,8 @@
  *     sel: string,
  *     selA / selB: string,
  *     getBox: fn,
- *     mark: 'gap' | undefined — fill the vertical gap band; implied if elA+elB or selA+selB
+ *     mark: 'gap' | undefined — fill the empty band between A and B
+ *       (vertical: A.bottom→B.top; horizontal: A.right→B.left). Implied if elA+elB or selA+selB
  *   }],
  *   legendTitle: '全部 10 处',
  *   notes: { aligned: '...', unmeasured: '...', design: '无' },
@@ -108,17 +109,34 @@
     return queryEl(it.sel);
   }
 
+  function axisOverlap(a1, a2, b1, b2) {
+    return Math.max(0, Math.min(a2, b2) - Math.max(a1, b1));
+  }
+
   function gapRect(a, b) {
     if (!a || !b) return null;
     var A = a.getBoundingClientRect();
     var B = b.getBoundingClientRect();
-    var left = Math.min(A.left, B.left);
-    var right = Math.max(A.right, B.right);
+    var yOverlap = axisOverlap(A.top, A.bottom, B.top, B.bottom);
+    var xOverlap = axisOverlap(A.left, A.right, B.left, B.right);
+    var sideBySide = yOverlap > xOverlap;
+    if (sideBySide) {
+      var leftEl = A.left <= B.left ? A : B;
+      var rightEl = A.left <= B.left ? B : A;
+      return {
+        x: leftEl.right,
+        y: Math.max(A.top, B.top),
+        w: Math.max(rightEl.left - leftEl.right, 4),
+        h: Math.max(yOverlap, 4),
+      };
+    }
+    var topEl = A.top <= B.top ? A : B;
+    var botEl = A.top <= B.top ? B : A;
     return {
-      x: left,
-      y: A.bottom,
-      w: Math.max(right - left, 4),
-      h: Math.max(B.top - A.bottom, 4),
+      x: Math.max(A.left, B.left),
+      y: topEl.bottom,
+      w: Math.max(xOverlap, 4),
+      h: Math.max(botEl.top - topEl.bottom, 4),
     };
   }
 
