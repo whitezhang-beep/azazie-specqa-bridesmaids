@@ -295,10 +295,15 @@
     panelWin = null;
   }
 
+  function existingPanel() {
+    if (panelWin && !panelWin.closed) return panelWin;
+    return null;
+  }
+
   function paint(opts) {
     if (Array.isArray(opts)) opts = { items: opts };
     opts = opts || {};
-    paint.remove();
+    paint.remove({ keepPanel: true });
     var items = opts.items || [];
     var prefs = loadPrefs();
     var showBadges = prefs.badges;
@@ -717,28 +722,7 @@
       host.innerHTML = html;
     }
 
-    function openSidePanel() {
-      var floatPanel = isFloatPanel(opts);
-      var suffix = deviceSuffix(device);
-      var winName = (opts && opts.panelName) || "azazie-spec-qa-panel-" + suffix.toLowerCase();
-      var winTitle = (opts && opts.panelTitle) || "Azazie 走查标注 · " + suffix;
-      var feat =
-        "popup=yes,width=" +
-        PANEL_W +
-        ",height=" +
-        PANEL_H +
-        ",left=" +
-        (floatPanel ? 80 : panelLeft()) +
-        ",top=" +
-        (floatPanel ? 80 : panelTop()) +
-        ",menubar=no,toolbar=no,location=no,status=no";
-      var w = null;
-      try {
-        w = window.open("about:blank", winName, feat);
-      } catch (e) {
-        w = null;
-      }
-      if (!w || w.closed) return false;
+    function fillPanel(w, winTitle) {
       panelWin = w;
       try {
         w.document.open();
@@ -750,15 +734,10 @@
         );
         w.document.close();
       } catch (e) {
-        closePanel();
         return false;
       }
       try {
-        if (!floatPanel) {
-          w.moveTo(panelLeft(), panelTop());
-        }
-        w.resizeTo(PANEL_W, PANEL_H);
-        w.focus();
+        w.name = (opts && opts.panelName) || "azazie-spec-qa-panel-" + deviceSuffix(device).toLowerCase();
       } catch (e) {}
       var doc = w.document;
       var wrap = doc.createElement("div");
@@ -777,9 +756,61 @@
       renderControlsInto(ctrl, false);
       bindControlHost(ctrl);
       fillLegend(list, legendTitleText());
-      w.addEventListener("beforeunload", function () {
-        if (panelWin === w) panelWin = null;
-      });
+      try {
+        w.addEventListener("beforeunload", function () {
+          if (panelWin === w) panelWin = null;
+        });
+      } catch (e) {}
+      return true;
+    }
+
+    function openSidePanel() {
+      var floatPanel = isFloatPanel(opts);
+      var suffix = deviceSuffix(device);
+      var winName = (opts && opts.panelName) || "azazie-spec-qa-panel-" + suffix.toLowerCase();
+      var winTitle = (opts && opts.panelTitle) || "Azazie 走查标注 · " + suffix;
+      var feat =
+        "popup=yes,width=" +
+        PANEL_W +
+        ",height=" +
+        PANEL_H +
+        ",left=" +
+        (floatPanel ? 80 : panelLeft()) +
+        ",top=" +
+        (floatPanel ? 80 : panelTop()) +
+        ",menubar=no,toolbar=no,location=no,status=no";
+      var w = existingPanel();
+      if (!w || w.closed) {
+        try {
+          w = window.open("", winName, feat);
+        } catch (e) {
+          w = null;
+        }
+      }
+      if ((!w || w.closed) && window.opener && !window.opener.closed) {
+        try {
+          w = window.opener.open("", winName, feat);
+        } catch (e) {}
+      }
+      if (!w || w.closed) {
+        try {
+          w = window.open("about:blank", winName, feat);
+        } catch (e) {
+          w = null;
+        }
+      }
+      if (!w || w.closed) return false;
+      if (!fillPanel(w, winTitle)) {
+        closePanel();
+        return false;
+      }
+      try {
+        if (!floatPanel) {
+          w.moveTo(panelLeft(), panelTop());
+        }
+        w.resizeTo(PANEL_W, PANEL_H);
+        w.focus();
+      } catch (e) {}
       return true;
     }
 
@@ -897,7 +928,8 @@
     };
   }
 
-  paint.remove = function () {
+  paint.remove = function (flags) {
+    flags = flags || {};
     if (scrollUnbind) {
       scrollUnbind();
       scrollUnbind = null;
@@ -906,7 +938,7 @@
       holdOpenUnbind();
       holdOpenUnbind = null;
     }
-    closePanel();
+    if (!flags.keepPanel) closePanel();
     var old = document.getElementById("azazie-spec-qa-overlay");
     if (old) old.remove();
   };
