@@ -719,7 +719,6 @@
     }
 
     function renderControlsInto(host, withLegendToggle) {
-      var miss = missingIds();
       var html =
         "<div style='font-weight:600;margin-bottom:6px'>标注开关</div>" +
         "<label style='display:block;cursor:pointer'><input type='checkbox' data-toggle='badges'" +
@@ -744,11 +743,6 @@
         "<button type='button' data-share='md' style='display:block;margin-top:8px;cursor:pointer;border:1px solid #ccc;background:#fff;padding:4px 8px;font-size:12px'>复制已确认清单</button>" +
         "<button type='button' data-share='json' style='display:block;margin-top:6px;cursor:pointer;border:1px solid #ccc;background:#fff;padding:4px 8px;font-size:12px'>复制分享包</button>";
       html +=
-        (miss.length
-          ? "<div style='margin-top:8px;color:#666;font-size:11px;line-height:16px'>当前页找不到：" +
-            miss.join("、") +
-            "</div>"
-          : "") +
         "<div data-creator='" +
         CREATOR_MARK +
         "' style='margin-top:8px;color:#666;font-size:11px;line-height:16px'>" +

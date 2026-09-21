@@ -11,7 +11,6 @@ h1 { font-size:16px; line-height:22px; margin:0 0 8px; }
 .muted { color:#666; font-size:12px; line-height:18px; }
 .card { background:#fff; border:1px solid #ccc; padding:16px; margin:0 0 12px; }
 .bm { display:inline-block; border:1px solid #121212; background:#fff; color:#121212; padding:8px 12px; text-decoration:none; font-size:13px; }
-.bm:hover { background:#f6f6f6; }
 ol { margin:8px 0 0; padding-left:20px; }
 li { margin:0 0 6px; }
 </style>
@@ -19,16 +18,16 @@ li { margin:0 0 6px; }
 <body>
 <main>
 <h1>Azazie 走查标注 · Bridesmaids 导航下拉 · PC</h1>
-<p class="muted">确认 14 处（已忽略 T1、S1、S2）· hover 只看该条 · 点击钉住 · 右侧 × 忽略</p>
+<p class="muted">确认 14 处（已忽略 T1、S1、S2） · hover 只看该条 · 点击钉住 · 右侧 × 忽略</p>
 <div class="card">
-  <div style="font-weight:600;margin-bottom:8px">在 ft2 上还原走查标注</div>
+  <div style="font-weight:600;margin-bottom:8px">在实现页上还原走查标注</div>
   <p class="muted">打开后应和验收时一样：页上红框 + 独立清单窗口，hover 某一条只显示该条。</p>
   <ol>
     <li>把这个按钮拖到浏览器书签栏：
-      <p><a class="bm" href="javascript:void(function(){if(!/azazie\.com$/i.test(location.hostname)){location.href='https://ft2.azazie.com/';return;}var s=document.createElement('script');s.src='https://whitezhang-beep.github.io/azazie-specqa-bridesmaids/replay.js?v=2';document.documentElement.appendChild(s);}())">Azazie走查</a></p>
+      <p><a class="bm" href="javascript:void(function(){var u="https://whitezhang-beep.github.io/azazie-specqa-bridesmaids/replay.js";var live="https://ft2.azazie.com/";if(live && location.href.indexOf(live.replace(/\/$/,''))!==0 && !/azazie\.com$/i.test(location.hostname)){location.href=live;return;}var s=document.createElement('script');s.src=u+(u.indexOf('?')>=0?'&':'?')+'t='+Date.now();document.documentElement.appendChild(s);}())">Azazie走查</a></p>
     </li>
     <li>打开 <a href="https://ft2.azazie.com/">https://ft2.azazie.com/</a></li>
-    <li>点书签「Azazie走查」。下拉会保持打开，右侧出现清单。</li>
+    <li>点书签「Azazie走查」。</li>
   </ol>
 </div>
 <p class="muted">Created by white.zhang.</p>
