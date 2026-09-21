@@ -224,25 +224,6 @@
     return parts.join(" > ");
   }
 
-  function copyText(text, doc) {
-    doc = doc || document;
-    var w = doc.defaultView || window;
-    if (w.navigator && w.navigator.clipboard && w.navigator.clipboard.writeText) {
-      w.navigator.clipboard.writeText(text);
-      return;
-    }
-    var ta = doc.createElement("textarea");
-    ta.value = text;
-    ta.setAttribute("readonly", "readonly");
-    ta.style.cssText = "position:fixed;left:-9999px;top:0";
-    doc.body.appendChild(ta);
-    ta.select();
-    try {
-      doc.execCommand("copy");
-    } catch (e) {}
-    ta.remove();
-  }
-
   function loadPrefs() {
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
@@ -702,19 +683,7 @@
         if (t) {
           e.preventDefault();
           restoreDismissed();
-          return;
         }
-        var share = e.target && e.target.getAttribute && e.target.getAttribute("data-share");
-        if (!share) return;
-        e.preventDefault();
-        var payload = exportShare();
-        var text = share === "json" ? JSON.stringify(payload, null, 2) : shareMarkdown(payload);
-        copyText(text, host.ownerDocument);
-        var orig = e.target.textContent;
-        e.target.textContent = share === "json" ? "已复制分享包" : "已复制已确认清单";
-        setTimeout(function () {
-          if (e.target) e.target.textContent = orig;
-        }, 1400);
       });
     }
 
@@ -739,9 +708,6 @@
           dismissed.length +
           "）</button>";
       }
-      html +=
-        "<button type='button' data-share='md' style='display:block;margin-top:8px;cursor:pointer;border:1px solid #ccc;background:#fff;padding:4px 8px;font-size:12px'>复制已确认清单</button>" +
-        "<button type='button' data-share='json' style='display:block;margin-top:6px;cursor:pointer;border:1px solid #ccc;background:#fff;padding:4px 8px;font-size:12px'>复制分享包</button>";
       html +=
         "<div data-creator='" +
         CREATOR_MARK +
