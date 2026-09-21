@@ -415,7 +415,7 @@
         var pl = panelWin.document.getElementById("azazie-spec-qa-legend");
         if (pl) fillLegend(pl, title);
       }
-      if (controls) renderControlsInto(controls, true);
+      if (controls) renderControlsInto(controls, false);
       if (panelWin && !panelWin.closed && panelWin.document) {
         var pc = panelWin.document.getElementById("azazie-spec-qa-controls");
         if (pc) renderControlsInto(pc, false);
@@ -790,21 +790,25 @@
     }
 
     if (!sideOk) {
+      var pagePanel = document.createElement("div");
+      pagePanel.id = "azazie-spec-qa-page-panel";
+      pagePanel.style.cssText =
+        "position:fixed;right:16px;top:80px;width:min(380px,calc(100vw - 32px));max-height:calc(100vh - 100px);display:flex;flex-direction:column;gap:12px;pointer-events:auto;z-index:2147483647;";
+      controls = document.createElement("div");
+      controls.id = "azazie-spec-qa-controls";
+      controls.style.cssText =
+        "background:#fff;color:#121212;border:1px solid #ccc;padding:8px 10px;font-size:12px;line-height:18px;flex:0 0 auto";
       legend = document.createElement("div");
       legend.id = "azazie-spec-qa-legend";
       legend.style.cssText =
-        "position:fixed;right:16px;top:80px;width:min(380px,calc(100vw - 32px));max-height:calc(100vh - 100px);overflow:auto;background:#fff;color:#121212;border:1px solid #ccc;padding:12px;font-size:12px;line-height:18px;pointer-events:auto;z-index:2147483647;";
-      fillLegend(legend, legendTitleText());
-      if (useSide) showLegend = false;
-      applyLegend();
-      layer.appendChild(legend);
-
-      controls = document.createElement("div");
-      controls.style.cssText =
-        "position:fixed;left:16px;top:80px;background:#fff;color:#121212;border:1px solid #ccc;padding:8px 10px;font-size:12px;line-height:18px;pointer-events:auto;z-index:2147483647;";
-      renderControlsInto(controls, true);
+        "background:#fff;color:#121212;border:1px solid #ccc;padding:12px;font-size:12px;line-height:18px;overflow:auto;flex:1 1 auto;min-height:0";
+      renderControlsInto(controls, false);
       bindControlHost(controls);
-      layer.appendChild(controls);
+      fillLegend(legend, legendTitleText());
+      applyLegend();
+      pagePanel.appendChild(controls);
+      pagePanel.appendChild(legend);
+      layer.appendChild(pagePanel);
     }
 
     document.body.appendChild(layer);
@@ -823,7 +827,7 @@
       });
       applyVisibility();
       applyLegend();
-      if (controls) renderControlsInto(controls, true);
+      if (controls) renderControlsInto(controls, false);
       if (panelWin && !panelWin.closed) {
         var pc = panelWin.document.getElementById("azazie-spec-qa-controls");
         if (pc) renderControlsInto(pc, false);
