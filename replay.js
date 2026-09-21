@@ -22,10 +22,11 @@
  *     521–767 → no Pad device in this skill; treat as PC unless the user said M
  *     If both omitted, same cut on innerWidth.
  *   panel: 'auto' | 'side' | 'float' | 'page'
- *     auto (default): M → side (docked **to the right of** the page window, no overlap);
- *       PC → float (independent, not covering the page)
+ *     auto (default): M → side (docked **to the right of** the live window, no overlap);
+ *       PC → float (independent `Azazie 走查标注 · PC` window; 开关+清单 live there)
  *     side: always to the right of the live window (`screenX + outerWidth + 8`)
- *     float / page: force layout; title still follows device
+ *     float: independent window. page: only if explicitly requested — never the PC default.
+ *     Live page shows red boxes only. Do not paint 开关/清单 onto the site.
  *   panelName / panelTitle: optional override for window name / document title
  *   holdOpen: CSS selector or [selectors] — keep dropdowns/panels display:block
  *     while the overlay is on (nav hover menus stay put for alignment)
@@ -42,6 +43,7 @@
 (function (root) {
   var scrollUnbind = null;
   var holdOpenUnbind = null;
+  var channelUnbind = null;
   var panelWin = null;
   var STORAGE_KEY = "azazie-spec-qa-overlay-toggles";
   var DISMISS_KEY = "azazie-spec-qa-overlay-dismissed";
@@ -300,6 +302,201 @@
     return null;
   }
 
+  function specQaChannelName(device) {
+    return "azazie-spec-qa-overlay-" + deviceSuffix(device).toLowerCase();
+  }
+
+  function specQaPanelBoot(channelName) {
+    var ch;
+    try {
+      ch = new BroadcastChannel(channelName);
+    } catch (e) {
+      return;
+    }
+    var state = {
+      items: [],
+      dismissed: [],
+      legendTitle: "全部 0 处",
+      notes: {},
+      showBadges: true,
+      showBoxes: true,
+      hoverId: null,
+      hoverPinned: false,
+      creator: "Created by white.zhang.",
+    };
+    function send(msg) {
+      msg.source = "panel";
+      ch.postMessage(msg);
+    }
+    function renderControls() {
+      var host = document.getElementById("azazie-spec-qa-controls");
+      if (!host) return;
+      var html =
+        "<div style='font-weight:600;margin-bottom:6px'>标注开关</div>" +
+        "<label style='display:block;cursor:pointer'><input type='checkbox' data-toggle='badges'" +
+        (state.showBadges ? " checked" : "") +
+        "> 编号标签</label>" +
+        "<label style='display:block;cursor:pointer'><input type='checkbox' data-toggle='boxes'" +
+        (state.showBoxes ? " checked" : "") +
+        "> 红框</label>";
+      if (state.dismissed && state.dismissed.length) {
+        html +=
+          "<button type='button' data-restore='1' style='display:block;margin-top:8px;cursor:pointer;border:1px solid #ccc;background:#fff;padding:4px 8px;font-size:12px'>恢复已忽略（" +
+          state.dismissed.length +
+          "）</button>";
+      }
+      html +=
+        "<div data-creator='white.zhang' style='margin-top:8px;color:#666;font-size:11px;line-height:16px'>" +
+        (state.creator || "Created by white.zhang.") +
+        "</div>";
+      host.innerHTML = html;
+    }
+    function renderLegend() {
+      var host = document.getElementById("azazie-spec-qa-legend");
+      if (!host) return;
+      host.innerHTML = "";
+      var titleEl = document.createElement("div");
+      titleEl.style.cssText = "font-weight:600;margin-bottom:4px;cursor:pointer";
+      titleEl.textContent = state.legendTitle;
+      titleEl.title = "点击显示全部红框";
+      titleEl.addEventListener("click", function () {
+        send({ type: "clearHover" });
+      });
+      host.appendChild(titleEl);
+      var hint = document.createElement("div");
+      hint.style.cssText = "margin:0 0 8px;font-size:11px;line-height:16px;color:#666666";
+      hint.textContent = "hover 只看该条；点击钉住；右侧 × 忽略该条";
+      host.appendChild(hint);
+      var credit = document.createElement("div");
+      credit.setAttribute("data-creator", "white.zhang");
+      credit.style.cssText = "margin:0 0 10px;font-size:11px;line-height:16px;color:#666666";
+      credit.textContent = state.creator || "Created by white.zhang.";
+      host.appendChild(credit);
+      (state.items || []).forEach(function (it) {
+        var c = it.sev === "严重" ? "#C62828" : "#E65100";
+        var row = document.createElement("div");
+        row.setAttribute("data-jump", it.id);
+        var dim = state.hoverId && state.hoverId !== it.id;
+        row.style.cssText =
+          "margin:0 0 6px;cursor:pointer;padding:4px 6px;margin-left:-6px;margin-right:-6px;border-radius:4px;display:flex;align-items:flex-start;gap:8px;background:" +
+          (state.hoverId === it.id ? "#F6F6F6" : "transparent") +
+          ";opacity:" +
+          (dim ? "0.4" : "1");
+        var body = document.createElement("div");
+        body.style.cssText = "flex:1 1 auto;min-width:0";
+        var idSpan = document.createElement("span");
+        idSpan.style.cssText = "color:" + c + ";font-weight:600";
+        idSpan.textContent = it.id + "  " + (it.sev || "");
+        body.appendChild(idSpan);
+        body.appendChild(document.createTextNode("  " + (it.label || "")));
+        var del = document.createElement("button");
+        del.type = "button";
+        del.setAttribute("data-dismiss", it.id);
+        del.textContent = "×";
+        del.title = "忽略这条";
+        del.style.cssText =
+          "flex:0 0 auto;margin-left:auto;border:0;background:transparent;color:#999;cursor:pointer;font-size:16px;line-height:16px;padding:0 4px";
+        del.addEventListener("click", function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          send({ type: "dismiss", id: it.id });
+        });
+        row.appendChild(body);
+        row.appendChild(del);
+        row.addEventListener("mouseenter", function () {
+          send({ type: "hover", id: it.id, pin: false });
+        });
+        row.addEventListener("mouseleave", function (e) {
+          if (state.hoverPinned) return;
+          var next = e.relatedTarget;
+          if (next && next.closest && next.closest("[data-jump]")) return;
+          send({ type: "clearHover" });
+        });
+        row.addEventListener("click", function () {
+          send({ type: "hover", id: it.id, pin: true });
+        });
+        host.appendChild(row);
+      });
+      if (state.dismissed && state.dismissed.length) {
+        var ignored = document.createElement("div");
+        ignored.style.cssText = "margin:0 0 8px;font-size:11px;line-height:16px;color:#666666";
+        ignored.textContent = "已忽略 " + state.dismissed.join("、") + "  ";
+        var undo = document.createElement("button");
+        undo.type = "button";
+        undo.textContent = "恢复";
+        undo.style.cssText =
+          "border:0;background:transparent;color:#121212;cursor:pointer;font-size:11px;padding:0;text-decoration:underline";
+        undo.addEventListener("click", function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          send({ type: "restore" });
+        });
+        ignored.appendChild(undo);
+        host.appendChild(ignored);
+      }
+      var notes = state.notes || {};
+      var noteBits = [
+        ["对齐的", notes.aligned || "无"],
+        ["未测 / 不算缺陷", notes.unmeasured || "无"],
+        ["设计侧备注", notes.design || "无"],
+      ];
+      var noteWrap = document.createElement("div");
+      noteWrap.style.cssText =
+        "margin-top:10px;padding-top:8px;border-top:1px solid #e6e6e6;color:#666666;font-size:11px;line-height:16px";
+      noteBits.forEach(function (pair) {
+        var line = document.createElement("div");
+        line.style.cssText = "margin:0 0 6px";
+        var head = document.createElement("span");
+        head.style.cssText = "font-weight:600;color:#121212";
+        head.textContent = pair[0] + " ";
+        line.appendChild(head);
+        line.appendChild(document.createTextNode(pair[1]));
+        noteWrap.appendChild(line);
+      });
+      host.appendChild(noteWrap);
+    }
+    document.addEventListener("change", function (e) {
+      var t = e.target && e.target.getAttribute && e.target.getAttribute("data-toggle");
+      if (t === "badges" || t === "boxes") {
+        send({ type: "toggle", key: t, value: !!e.target.checked });
+      }
+    });
+    document.addEventListener("click", function (e) {
+      var t = e.target && e.target.getAttribute && e.target.getAttribute("data-restore");
+      if (t) {
+        e.preventDefault();
+        send({ type: "restore" });
+      }
+    });
+    ch.onmessage = function (e) {
+      var m = e.data || {};
+      if (m.source !== "page") return;
+      if (m.type === "ping") {
+        send({ type: "hello" });
+        return;
+      }
+      if (m.type === "hoverSync") {
+        state.hoverId = m.id || null;
+        state.hoverPinned = !!m.pin;
+        var rows = document.querySelectorAll("[data-jump]");
+        Array.prototype.forEach.call(rows, function (row) {
+          var id = row.getAttribute("data-jump");
+          var dim = state.hoverId && state.hoverId !== id;
+          row.style.background = state.hoverId === id ? "#F6F6F6" : "transparent";
+          row.style.opacity = dim ? "0.4" : "1";
+        });
+        return;
+      }
+      if (m.type === "state") {
+        state = m;
+        state.creator = state.creator || "Created by white.zhang.";
+        renderControls();
+        renderLegend();
+      }
+    };
+    send({ type: "hello" });
+  }
+
   function paint(opts) {
     if (Array.isArray(opts)) opts = { items: opts };
     opts = opts || {};
@@ -318,6 +515,11 @@
     var device = resolveDevice(opts);
     var useSide = wantSidePanel(opts);
     var floatPanel = isFloatPanel(opts);
+    var channelName = specQaChannelName(device);
+    var channel = null;
+    try {
+      channel = new BroadcastChannel(channelName);
+    } catch (e) {}
     var layer = document.createElement("div");
     layer.id = "azazie-spec-qa-overlay";
     layer.setAttribute("data-creator", CREATOR_MARK);
@@ -373,12 +575,14 @@
       hoverPinned = !!id && pin === true;
       applyVisibility();
       paintLegendRows();
+      pushHoverSync();
     }
     function clearHover() {
       hoverId = null;
       hoverPinned = false;
       applyVisibility();
       paintLegendRows();
+      pushHoverSync();
     }
     function isDismissed(id) {
       return dismissed.indexOf(id) !== -1;
@@ -416,15 +620,8 @@
     function refreshLegendsAndControls() {
       var title = legendTitleText();
       if (legend) fillLegend(legend, title);
-      if (panelWin && !panelWin.closed && panelWin.document) {
-        var pl = panelWin.document.getElementById("azazie-spec-qa-legend");
-        if (pl) fillLegend(pl, title);
-      }
       if (controls) renderControlsInto(controls, false);
-      if (panelWin && !panelWin.closed && panelWin.document) {
-        var pc = panelWin.document.getElementById("azazie-spec-qa-controls");
-        if (pc) renderControlsInto(pc, false);
-      }
+      pushPanelState();
     }
     function dismissItem(id) {
       if (!id || isDismissed(id)) return;
@@ -722,6 +919,37 @@
       host.innerHTML = html;
     }
 
+    function pushPanelState() {
+      if (!channel) return;
+      var visible = items.filter(function (it) {
+        return !isDismissed(it.id);
+      });
+      channel.postMessage({
+        source: "page",
+        type: "state",
+        legendTitle: legendTitleText(),
+        items: visible.map(function (it) {
+          return { id: it.id, sev: it.sev || "", label: it.label || "" };
+        }),
+        dismissed: dismissed.slice(),
+        notes: (opts && opts.notes) || {},
+        showBadges: showBadges,
+        showBoxes: showBoxes,
+        hoverId: hoverId,
+        hoverPinned: hoverPinned,
+        creator: CREATOR_LINE,
+      });
+    }
+    function pushHoverSync() {
+      if (!channel) return;
+      channel.postMessage({
+        source: "page",
+        type: "hoverSync",
+        id: hoverId,
+        pin: hoverPinned,
+      });
+    }
+
     function fillPanel(w, winTitle) {
       panelWin = w;
       try {
@@ -753,14 +981,15 @@
       wrap.appendChild(ctrl);
       wrap.appendChild(list);
       doc.body.appendChild(wrap);
-      renderControlsInto(ctrl, false);
-      bindControlHost(ctrl);
-      fillLegend(list, legendTitleText());
+      var boot = doc.createElement("script");
+      boot.textContent = "(" + specQaPanelBoot.toString() + ")(" + JSON.stringify(channelName) + ")";
+      doc.body.appendChild(boot);
       try {
         w.addEventListener("beforeunload", function () {
           if (panelWin === w) panelWin = null;
         });
       } catch (e) {}
+      pushPanelState();
       return true;
     }
 
@@ -780,6 +1009,13 @@
         (floatPanel ? 80 : panelTop()) +
         ",menubar=no,toolbar=no,location=no,status=no";
       var w = existingPanel();
+      if (!w || w.closed) {
+        try {
+          w = window.open("", winName);
+        } catch (e) {
+          w = null;
+        }
+      }
       if (!w || w.closed) {
         try {
           w = window.open("", winName, feat);
@@ -814,13 +1050,63 @@
       return true;
     }
 
+    if (channel) {
+      channel.onmessage = function (e) {
+        var m = e.data || {};
+        if (m.source !== "panel") return;
+        if (m.type === "hello") {
+          pushPanelState();
+          return;
+        }
+        if (m.type === "hover") {
+          setHover(m.id, !!m.pin);
+          if (m.pin) jumpTo(m.id);
+          return;
+        }
+        if (m.type === "clearHover") {
+          clearHover();
+          return;
+        }
+        if (m.type === "dismiss") {
+          dismissItem(m.id);
+          return;
+        }
+        if (m.type === "restore") {
+          restoreDismissed();
+          return;
+        }
+        if (m.type === "toggle") {
+          if (m.key === "badges") {
+            showBadges = !!m.value;
+            var badges = layer.querySelectorAll("[data-azazie-badge]");
+            Array.prototype.forEach.call(badges, function (b) {
+              b.style.display = showBadges ? "block" : "none";
+            });
+            savePrefs();
+            pushPanelState();
+          }
+          if (m.key === "boxes") {
+            showBoxes = !!m.value;
+            applyVisibility();
+            savePrefs();
+            pushPanelState();
+          }
+        }
+      };
+    }
+
     var sideOk = false;
     if (useSide) {
       sideOk = openSidePanel();
       if (sideOk) showLegend = false;
+      if (channel) {
+        try {
+          channel.postMessage({ source: "page", type: "ping" });
+        } catch (e) {}
+      }
     }
 
-    if (!sideOk) {
+    if (!sideOk && opts.panel === "page") {
       var pagePanel = document.createElement("div");
       pagePanel.id = "azazie-spec-qa-page-panel";
       pagePanel.style.cssText =
@@ -848,6 +1134,28 @@
     paint.jump = jumpTo;
     paint.exportShare = exportShare;
     paint.shareMarkdown = shareMarkdown;
+    paint.attachPanel = function (w) {
+      var suffix = deviceSuffix(device);
+      var winTitle = (opts && opts.panelTitle) || "Azazie 走查标注 · " + suffix;
+      if (!w || w.closed) return { ok: false };
+      var ok = fillPanel(w, winTitle);
+      if (ok) {
+        sideOk = true;
+        showLegend = false;
+        try {
+          w.focus();
+        } catch (e) {}
+      }
+      return { ok: ok, panel: ok ? (floatPanel ? "float" : "side") : "none" };
+    };
+    channelUnbind = function () {
+      if (channel) {
+        try {
+          channel.close();
+        } catch (e) {}
+        channel = null;
+      }
+    };
 
     function relayout() {
       layer.style.height = docSize() + "px";
@@ -859,14 +1167,10 @@
       applyVisibility();
       applyLegend();
       if (controls) renderControlsInto(controls, false);
-      if (panelWin && !panelWin.closed) {
-        var pc = panelWin.document.getElementById("azazie-spec-qa-controls");
-        if (pc) renderControlsInto(pc, false);
-        if (!floatPanel) {
-          try {
-            panelWin.moveTo(panelLeft(), panelTop());
-          } catch (e) {}
-        }
+      if (panelWin && !panelWin.closed && !floatPanel) {
+        try {
+          panelWin.moveTo(panelLeft(), panelTop());
+        } catch (e) {}
       }
     }
     window.addEventListener("scroll", relayout, true);
@@ -923,7 +1227,7 @@
       ok: true,
       n: tracked.length,
       missing: missingIds(),
-      panel: sideOk ? (floatPanel ? "float" : "side") : "page",
+      panel: sideOk ? (floatPanel ? "float" : "side") : opts.panel === "page" ? "page" : "window",
       device: device,
     };
   }
@@ -937,6 +1241,10 @@
     if (holdOpenUnbind) {
       holdOpenUnbind();
       holdOpenUnbind = null;
+    }
+    if (channelUnbind) {
+      channelUnbind();
+      channelUnbind = null;
     }
     if (!flags.keepPanel) closePanel();
     var old = document.getElementById("azazie-spec-qa-overlay");
